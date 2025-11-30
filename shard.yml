@@ -11,6 +11,6 @@ license: MIT
 dependencies:
   crumble:
     github: sbsoftware/crumble
-    version: ">= 0.23.1"
+    version: ">= 0.26.0"
   orma:
     github: sbsoftware/orma

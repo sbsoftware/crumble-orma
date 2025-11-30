@@ -19,10 +19,8 @@ module Crumble::Orma::AttributeSpec
   end
 
   class Style < CSS::Stylesheet
-    rules do
-      rule Model.active(false) do
-        display None
-      end
+    rule Model.active(false) do
+      display :none
     end
   end
 
@@ -42,7 +40,6 @@ module Crumble::Orma::AttributeSpec
       [data-orma-crumble--orma--attribute-spec--model-active='false'] {
         display: none;
       }
-
       CSS
 
       Style.to_s.should eq(expected)

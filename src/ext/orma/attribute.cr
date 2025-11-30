@@ -3,7 +3,7 @@ class Orma::Attribute(T)
     attrs[html_attr_name] = value.to_s
   end
 
-  def selector
+  def to_css_selector
     CSS::AttrSelector.new(html_attr_name, value.to_s)
   end
 
