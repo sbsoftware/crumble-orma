@@ -42,6 +42,38 @@ end
 The `model` macro defines a `user_id` path param, loads the record before handling the
 request, exposes `user` in the page view, and returns 404 when the record is missing.
 
+You can provide a redirect or a fallback view when the record is missing:
+
+```crystal
+class UserPage < Crumble::Page
+  model user : User, fallback_redirect: "/"
+
+  view do
+    template do
+      p { user.name }
+    end
+  end
+end
+
+class MissingUserView
+  include Crumble::ContextView
+
+  template do
+    p { "User not found" }
+  end
+end
+
+class UserFallbackViewPage < Crumble::Page
+  model user : User, fallback_view: MissingUserView
+
+  view do
+    template do
+      p { user.name }
+    end
+  end
+end
+```
+
 ### Orma attributes in HTML + CSS
 
 ```crystal

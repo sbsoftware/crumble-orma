@@ -15,6 +15,34 @@ module Crumble::Orma::PageModelSpec
     end
   end
 
+  class MissingUserView
+    include Crumble::ContextView
+
+    template do
+      p { "User not found" }
+    end
+  end
+
+  class UserFallbackRedirectPage < Crumble::Page
+    model user : User, fallback_redirect: "/fallback"
+
+    view do
+      template do
+        p { user.name }
+      end
+    end
+  end
+
+  class UserFallbackViewPage < Crumble::Page
+    model user : User, fallback_view: MissingUserView
+
+    view do
+      template do
+        p { user.name }
+      end
+    end
+  end
+
   describe "Crumble::Page.model" do
     before_each do
       User.continuous_migration!
@@ -46,6 +74,29 @@ module Crumble::Orma::PageModelSpec
       end
 
       res.should eq("")
+    end
+
+    it "redirects when fallback_redirect is provided" do
+      res = String.build do |io|
+        ctx = Crumble::Server::TestRequestContext.new(response_io: io, resource: UserFallbackRedirectPage.uri_path(user_id: 123))
+        UserFallbackRedirectPage.handle(ctx).should eq(true)
+        ctx.response.status_code.should eq(303)
+        ctx.response.headers["Location"].should eq("/fallback")
+        ctx.response.flush
+      end
+
+      res.should eq("")
+    end
+
+    it "renders the fallback_view when provided" do
+      res = String.build do |io|
+        ctx = Crumble::Server::TestRequestContext.new(response_io: io, resource: UserFallbackViewPage.uri_path(user_id: 123))
+        UserFallbackViewPage.handle(ctx).should eq(true)
+        ctx.response.status_code.should eq(404)
+        ctx.response.flush
+      end
+
+      res.should contain("User not found")
     end
   end
 end
