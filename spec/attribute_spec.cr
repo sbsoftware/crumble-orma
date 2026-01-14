@@ -1,7 +1,7 @@
 require "./spec_helper"
 
 module Crumble::Orma::AttributeSpec
-  class Model < FakeRecord
+  class Model < TestRecord
     id_column id : Int32
     column active : Bool
   end
