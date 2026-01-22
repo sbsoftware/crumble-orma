@@ -5,6 +5,10 @@ module Crumble::Orma::PageModelSpec
     column name : String
   end
 
+  class Account < TestRecord
+    column name : String
+  end
+
   class UserPage < Crumble::Page
     model user : User
 
@@ -39,6 +43,25 @@ module Crumble::Orma::PageModelSpec
     view do
       template do
         p { user.name }
+      end
+    end
+  end
+
+  class AccountUserPage < Crumble::Page
+    model account : Account
+    model user : User
+
+    view do
+      template do
+        p { "#{account.id} #{user.id}" }
+      end
+    end
+  end
+
+  class PlainPage < Crumble::Page
+    view do
+      template do
+        p { "Plain" }
       end
     end
   end
@@ -97,6 +120,19 @@ module Crumble::Orma::PageModelSpec
       end
 
       res.should contain("User not found")
+    end
+
+    it "builds a positional uri_path for model ids" do
+      account_id = Account.id(10)
+      user_id = User.id(20)
+
+      AccountUserPage.uri_path(account_id, user_id).should eq(
+        AccountUserPage.uri_path(account_id: account_id, user_id: user_id)
+      )
+    end
+
+    it "falls back to the default uri_path when no models are declared" do
+      PlainPage.uri_path.should eq(PlainPage._root_path)
     end
   end
 end
