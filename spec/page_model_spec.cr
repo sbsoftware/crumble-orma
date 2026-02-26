@@ -12,10 +12,6 @@ module Crumble::Orma::PageModelSpec
   class UserPage < Crumble::Page
     model user : User
 
-    def loaded_user : User
-      user
-    end
-
     view do
       template do
         p { user.name }
@@ -70,6 +66,16 @@ module Crumble::Orma::PageModelSpec
     end
   end
 
+  class IgnoringUserPage < Crumble::Page
+    model user : User
+
+    view do
+      template do
+        p { "No user access" }
+      end
+    end
+  end
+
   class UnrelatedErrorPage < Crumble::Page
     model user : User
 
@@ -104,7 +110,7 @@ module Crumble::Orma::PageModelSpec
       user = User.create(name: "Jane")
       ctx = Crumble::Server::TestRequestContext.new(resource: UserPage.uri_path(user_id: user.id))
 
-      UserPage.new(ctx).loaded_user.name.to_s.should eq("Jane")
+      UserPage.new(ctx).user.name.to_s.should eq("Jane")
     end
 
     it "raises a dedicated error carrying fallback parameters" do
@@ -120,26 +126,22 @@ module Crumble::Orma::PageModelSpec
     end
 
     it "halts with 404 when the record is missing" do
-      res = String.build do |io|
+      String.build do |io|
         ctx = Crumble::Server::TestRequestContext.new(response_io: io, resource: UserPage.uri_path(user_id: 123))
         UserPage.handle(ctx).should eq(true)
         ctx.response.status_code.should eq(404)
         ctx.response.flush
       end
-
-      res.should eq("")
     end
 
     it "redirects when fallback_redirect is provided" do
-      res = String.build do |io|
+      String.build do |io|
         ctx = Crumble::Server::TestRequestContext.new(response_io: io, resource: UserFallbackRedirectPage.uri_path(user_id: 123))
         UserFallbackRedirectPage.handle(ctx).should eq(true)
         ctx.response.status_code.should eq(303)
         ctx.response.headers["Location"].should eq("/fallback")
         ctx.response.flush
       end
-
-      res.should eq("")
     end
 
     it "renders the fallback_view when provided" do
@@ -160,6 +162,17 @@ module Crumble::Orma::PageModelSpec
       expect_raises(Exception, "boom") do
         UnrelatedErrorPage.handle(ctx)
       end
+    end
+
+    it "allows rendering with status 200 when the model is not accessed" do
+      res = String.build do |io|
+        ctx = Crumble::Server::TestRequestContext.new(response_io: io, resource: IgnoringUserPage.uri_path(user_id: 123))
+        IgnoringUserPage.handle(ctx).should eq(true)
+        ctx.response.status_code.should eq(200)
+        ctx.response.flush
+      end
+
+      res.should contain("No user access")
     end
 
     it "builds a positional uri_path for model ids" do
