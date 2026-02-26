@@ -3,9 +3,9 @@ require "orma"
 class Crumble::Page
   class ModelNotFoundError < Exception
     getter fallback_redirect : String?
-    getter fallback_view_renderer : Proc(Crumble::Page, Nil)?
+    getter fallback_view_renderer : Proc(Nil)?
 
-    def initialize(@fallback_redirect : String? = nil, @fallback_view_renderer : Proc(Crumble::Page, Nil)? = nil)
+    def initialize(@fallback_redirect : String? = nil, @fallback_view_renderer : Proc(Nil)? = nil)
       super("Page model record not found")
     end
   end
@@ -13,44 +13,16 @@ class Crumble::Page
   annotation ModelParam; end
 
   def self.handle(ctx) : Bool
-    return false if match(ctx.request.path).nil?
-    return false unless ctx.request.method == "GET"
-
-    instance = new(ctx)
-    if instance.responds_to? :_before
-      ret_val = instance._before
-      if ret_val == false
-        ctx.response.status = :bad_request
-        return true
-      elsif ret_val.is_a?(Int32)
-        ctx.response.status_code = ret_val
-        return true
-      end
-    end
-
-    begin
-      instance._prepare_models_for_request
-      instance.call
-    rescue ex : ModelNotFoundError
-      instance.handle_model_not_found(ex)
-    end
-
-    true
-  end
-
-  protected def handle_model_not_found(error : ModelNotFoundError) : Nil
-    if fallback_redirect = error.fallback_redirect
+    previous_def(ctx)
+  rescue ex : ModelNotFoundError
+    if fallback_redirect = ex.fallback_redirect
       ctx.response.status_code = 303
       ctx.response.headers["Location"] = fallback_redirect
-      return
+    else
+      ex.fallback_view_renderer.try &.call
+      ctx.response.status_code = 404
     end
-
-    # Render the fallback view through the page to preserve layout behavior.
-    error.fallback_view_renderer.try &.call(self)
-    ctx.response.status_code = 404
-  end
-
-  protected def _prepare_models_for_request : Nil
+    true
   end
 
   macro model(type_decl, fallback_redirect = nil, fallback_view = nil)
@@ -85,17 +57,16 @@ class Crumble::Page
           fallback_redirect: {{fallback_redirect}},
           fallback_view_renderer:
             {% if !fallback_view.is_a?(NilLiteral) %}
-              ->(%page : Crumble::Page) do
-                %ctx = %page.ctx
-                %tpl = {{fallback_view}}.new(ctx: %ctx)
-                %ctx.response.headers["Content-Type"] = "text/html"
+              -> do
+                %tpl = {{fallback_view}}.new(ctx: ctx)
+                ctx.response.headers["Content-Type"] = "text/html"
 
-                if %layout = %page.page_layout
-                  %layout.to_html(%ctx.response) do |io, indent_level|
+                if %layout = page_layout
+                  %layout.to_html(ctx.response) do |io, indent_level|
                     %tpl.to_html(io, indent_level)
                   end
                 else
-                  %tpl.to_html(%ctx.response)
+                  %tpl.to_html(ctx.response)
                 end
               end
             {% else %}
@@ -103,18 +74,6 @@ class Crumble::Page
             {% end %}
         )
       end
-    end
-
-    protected def _prepare_models_for_request : Nil
-      {% if @type.has_method?("_prepare_models_for_request") %}
-        {% if @type.methods.map(&.name.id.stringify).includes?("_prepare_models_for_request") %}
-          previous_def
-        {% else %}
-          super
-        {% end %}
-      {% end %}
-      {{name.id}}
-      nil
     end
   end
 
