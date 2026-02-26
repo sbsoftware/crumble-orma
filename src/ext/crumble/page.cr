@@ -1,7 +1,57 @@
 require "orma"
 
 class Crumble::Page
+  class ModelNotFoundError < Exception
+    getter fallback_redirect : String?
+    getter fallback_view_renderer : Proc(Crumble::Page, Nil)?
+
+    def initialize(@fallback_redirect : String? = nil, @fallback_view_renderer : Proc(Crumble::Page, Nil)? = nil)
+      super("Page model record not found")
+    end
+  end
+
   annotation ModelParam; end
+
+  def self.handle(ctx) : Bool
+    return false if match(ctx.request.path).nil?
+    return false unless ctx.request.method == "GET"
+
+    instance = new(ctx)
+    if instance.responds_to? :_before
+      ret_val = instance._before
+      if ret_val == false
+        ctx.response.status = :bad_request
+        return true
+      elsif ret_val.is_a?(Int32)
+        ctx.response.status_code = ret_val
+        return true
+      end
+    end
+
+    begin
+      instance._prepare_models_for_request
+      instance.call
+    rescue ex : ModelNotFoundError
+      instance.handle_model_not_found(ex)
+    end
+
+    true
+  end
+
+  protected def handle_model_not_found(error : ModelNotFoundError) : Nil
+    if fallback_redirect = error.fallback_redirect
+      ctx.response.status_code = 303
+      ctx.response.headers["Location"] = fallback_redirect
+      return
+    end
+
+    # Render the fallback view through the page to preserve layout behavior.
+    error.fallback_view_renderer.try &.call(self)
+    ctx.response.status_code = 404
+  end
+
+  protected def _prepare_models_for_request : Nil
+  end
 
   macro model(type_decl, fallback_redirect = nil, fallback_view = nil)
     {% if !fallback_redirect.is_a?(NilLiteral) && !fallback_view.is_a?(NilLiteral) %}
@@ -21,39 +71,50 @@ class Crumble::Page
 
     view do
       def {{name.id}} : {{klass}}
-        ctx.handler.as({{@type}}).{{name.id}}.not_nil!
+        ctx.handler.as({{@type}}).{{name.id}}
       end
     end
 
     @[Crumble::Page::ModelParam(param_name: {{param_name.symbolize}})]
-    getter {{name.id}} : {{klass}}?
-
-    before do
+    getter {{name.id}} : {{klass}} do
       %id = Int64.from_http_param({{param_name.id}})
-      @{{name.id}} = {{klass}}.where(id: %id).first?
-      unless @{{name.id}}
-        {% if !fallback_redirect.is_a?(NilLiteral) %}
-          ctx.response.status_code = 303
-          ctx.response.headers["Location"] = {{fallback_redirect}}
-          return 303
-        {% elsif !fallback_view.is_a?(NilLiteral) %}
-          %tpl = {{fallback_view}}.new(ctx: ctx)
-          ctx.response.headers["Content-Type"] = "text/html"
+      if %record = {{klass}}.where(id: %id).first?
+        %record
+      else
+        raise Crumble::Page::ModelNotFoundError.new(
+          fallback_redirect: {{fallback_redirect}},
+          fallback_view_renderer:
+            {% if !fallback_view.is_a?(NilLiteral) %}
+              ->(%page : Crumble::Page) do
+                %ctx = %page.ctx
+                %tpl = {{fallback_view}}.new(ctx: %ctx)
+                %ctx.response.headers["Content-Type"] = "text/html"
 
-          if %layout = page_layout
-            %layout.to_html(ctx.response) do |io, indent_level|
-              %tpl.to_html(io, indent_level)
-            end
-          else
-            %tpl.to_html(ctx.response)
-          end
-
-          return 404
-        {% else %}
-          return 404
-        {% end %}
+                if %layout = %page.page_layout
+                  %layout.to_html(%ctx.response) do |io, indent_level|
+                    %tpl.to_html(io, indent_level)
+                  end
+                else
+                  %tpl.to_html(%ctx.response)
+                end
+              end
+            {% else %}
+              nil
+            {% end %}
+        )
       end
-      true
+    end
+
+    protected def _prepare_models_for_request : Nil
+      {% if @type.has_method?("_prepare_models_for_request") %}
+        {% if @type.methods.map(&.name.id.stringify).includes?("_prepare_models_for_request") %}
+          previous_def
+        {% else %}
+          super
+        {% end %}
+      {% end %}
+      {{name.id}}
+      nil
     end
   end
 
