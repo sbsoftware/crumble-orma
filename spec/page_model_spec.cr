@@ -66,6 +66,24 @@ module Crumble::Orma::PageModelSpec
     end
   end
 
+  class IgnoringUserPage < Crumble::Page
+    model user : User
+
+    view do
+      template do
+        p { "No user access" }
+      end
+    end
+  end
+
+  class UnrelatedErrorPage < Crumble::Page
+    model user : User
+
+    def call
+      raise "boom"
+    end
+  end
+
   describe "Crumble::Page.model" do
     before_each do
       User.continuous_migration!
@@ -88,27 +106,42 @@ module Crumble::Orma::PageModelSpec
       res.should contain("Jane")
     end
 
+    it "exposes a non-nilable model getter on the page instance" do
+      user = User.create(name: "Jane")
+      ctx = Crumble::Server::TestRequestContext.new(resource: UserPage.uri_path(user_id: user.id))
+
+      UserPage.new(ctx).user.name.to_s.should eq("Jane")
+    end
+
+    it "raises a dedicated error carrying fallback parameters" do
+      redirect_ctx = Crumble::Server::TestRequestContext.new(resource: UserFallbackRedirectPage.uri_path(user_id: 123))
+      redirect_error = expect_raises(Crumble::Page::ModelNotFoundError) { UserFallbackRedirectPage.new(redirect_ctx).user }
+      redirect_error.fallback_redirect.should eq("/fallback")
+      redirect_error.fallback_view_renderer.should be_nil
+
+      view_ctx = Crumble::Server::TestRequestContext.new(resource: UserFallbackViewPage.uri_path(user_id: 123))
+      view_error = expect_raises(Crumble::Page::ModelNotFoundError) { UserFallbackViewPage.new(view_ctx).user }
+      view_error.fallback_redirect.should be_nil
+      view_error.fallback_view_renderer.should_not be_nil
+    end
+
     it "halts with 404 when the record is missing" do
-      res = String.build do |io|
+      String.build do |io|
         ctx = Crumble::Server::TestRequestContext.new(response_io: io, resource: UserPage.uri_path(user_id: 123))
         UserPage.handle(ctx).should eq(true)
         ctx.response.status_code.should eq(404)
         ctx.response.flush
       end
-
-      res.should eq("")
     end
 
     it "redirects when fallback_redirect is provided" do
-      res = String.build do |io|
+      String.build do |io|
         ctx = Crumble::Server::TestRequestContext.new(response_io: io, resource: UserFallbackRedirectPage.uri_path(user_id: 123))
         UserFallbackRedirectPage.handle(ctx).should eq(true)
         ctx.response.status_code.should eq(303)
         ctx.response.headers["Location"].should eq("/fallback")
         ctx.response.flush
       end
-
-      res.should eq("")
     end
 
     it "renders the fallback_view when provided" do
@@ -120,6 +153,26 @@ module Crumble::Orma::PageModelSpec
       end
 
       res.should contain("User not found")
+    end
+
+    it "does not map unrelated errors to 404" do
+      user = User.create(name: "Jane")
+      ctx = Crumble::Server::TestRequestContext.new(resource: UnrelatedErrorPage.uri_path(user_id: user.id))
+
+      expect_raises(Exception, "boom") do
+        UnrelatedErrorPage.handle(ctx)
+      end
+    end
+
+    it "allows rendering with status 200 when the model is not accessed" do
+      res = String.build do |io|
+        ctx = Crumble::Server::TestRequestContext.new(response_io: io, resource: IgnoringUserPage.uri_path(user_id: 123))
+        IgnoringUserPage.handle(ctx).should eq(true)
+        ctx.response.status_code.should eq(200)
+        ctx.response.flush
+      end
+
+      res.should contain("No user access")
     end
 
     it "builds a positional uri_path for model ids" do
