@@ -14,5 +14,4 @@ abstract class TestRecord < Orma::Record
   def self.db_connection_string
     ::TEST_DB_CONNECTION_STRING
   end
-
 end
