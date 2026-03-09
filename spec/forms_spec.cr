@@ -2,7 +2,6 @@ require "./spec_helper"
 
 module Crumble::Orma::FormsSpec
   class Model < TestRecord
-    id_column id : Int64
     column name : String
   end
 

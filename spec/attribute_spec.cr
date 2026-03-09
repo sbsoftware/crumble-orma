@@ -2,7 +2,6 @@ require "./spec_helper"
 
 module Crumble::Orma::AttributeSpec
   class Model < TestRecord
-    id_column id : Int32
     column active : Bool
   end
 
@@ -32,7 +31,7 @@ module Crumble::Orma::AttributeSpec
       </div>
       HTML
 
-      View.new(Model.new(id: 1, active: true)).to_html.should eq(expected)
+      View.new(Model.new(id: 1_i64, active: true)).to_html.should eq(expected)
     end
 
     it "can be used as a selector in a CSS rule" do
