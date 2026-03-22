@@ -41,12 +41,6 @@ class Crumble::Page
 
     path_param {{param_name}}
 
-    view do
-      def {{name.id}} : {{klass}}
-        ctx.handler.as({{@type}}).{{name.id}}
-      end
-    end
-
     @[Crumble::Page::ModelParam(param_name: {{param_name.symbolize}})]
     getter {{name.id}} : {{klass}} do
       %id = Int64.from_http_param({{param_name.id}})
