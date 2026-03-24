@@ -68,6 +68,7 @@ module Crumble::Orma::FormsSpec
       )
 
       form.valid?.should be_true
+      form.submitted?.should be_true
       form.model.should be(group)
       form.recipient_id.should eq(2_i64)
       form.to_html.should contain(%(<option value="1">Alice</option>))

@@ -2,7 +2,11 @@ class Crumble::ModelForm(TModel) < Crumble::Form
   getter model : TModel
 
   def initialize(ctx : Crumble::Server::HandlerContext, @model : TModel, **values : **T) forall T
-    super(ctx, **values)
+    super(ctx, false, **values)
+  end
+
+  def initialize(ctx : Crumble::Server::HandlerContext, submitted : Bool, @model : TModel, **values : **T) forall T
+    super(ctx, submitted, **values)
   end
 
   def self.from_www_form(ctx : Crumble::Server::HandlerContext, model : TModel, www_form : ::String) : self
@@ -15,7 +19,7 @@ class Crumble::ModelForm(TModel) < Crumble::Form
         %field{ivar.name} = {{ivar.type}}.from_www_form(params, {{ivar.name.stringify}})
       {% end %}
 
-      new(ctx, model,
+      new(ctx, true, model,
         {% for ivar in @type.instance_vars.select { |iv| iv.annotation(Crumble::Form::Field) } %}
           {{ivar.name.id}}: %field{ivar.name},
         {% end %}
