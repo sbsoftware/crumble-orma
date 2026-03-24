@@ -31,16 +31,16 @@ end
 class UserPage < Crumble::Page
   model user : User
 
-  view do
-    template do
-      p { user.name }
-    end
+  template do
+    p { user.name }
   end
 end
 ```
 
 The `model` macro defines a `user_id` path param, loads the record before handling the
-request, exposes `user` in the page view, and returns 404 when the record is missing.
+request, exposes `user` directly in the page template, and returns 404 when the record
+is missing. With `crumble >= 0.31.0`, prefer defining the page markup directly with
+`template do`.
 
 You can provide a redirect or a fallback view when the record is missing:
 
@@ -48,10 +48,8 @@ You can provide a redirect or a fallback view when the record is missing:
 class UserPage < Crumble::Page
   model user : User, fallback_redirect: "/"
 
-  view do
-    template do
-      p { user.name }
-    end
+  template do
+    p { user.name }
   end
 end
 
@@ -66,10 +64,8 @@ end
 class UserFallbackViewPage < Crumble::Page
   model user : User, fallback_view: MissingUserView
 
-  view do
-    template do
-      p { user.name }
-    end
+  template do
+    p { user.name }
   end
 end
 ```

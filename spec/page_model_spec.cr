@@ -12,10 +12,8 @@ module Crumble::Orma::PageModelSpec
   class UserPage < Crumble::Page
     model user : User
 
-    view do
-      template do
-        p { user.name }
-      end
+    template do
+      p { user.name }
     end
   end
 
@@ -30,20 +28,16 @@ module Crumble::Orma::PageModelSpec
   class UserFallbackRedirectPage < Crumble::Page
     model user : User, fallback_redirect: "/fallback"
 
-    view do
-      template do
-        p { user.name }
-      end
+    template do
+      p { user.name }
     end
   end
 
   class UserFallbackViewPage < Crumble::Page
     model user : User, fallback_view: MissingUserView
 
-    view do
-      template do
-        p { user.name }
-      end
+    template do
+      p { user.name }
     end
   end
 
@@ -51,28 +45,22 @@ module Crumble::Orma::PageModelSpec
     model account : Account
     model user : User
 
-    view do
-      template do
-        p { "#{account.id} #{user.id}" }
-      end
+    template do
+      p { "#{account.id} #{user.id}" }
     end
   end
 
   class PlainPage < Crumble::Page
-    view do
-      template do
-        p { "Plain" }
-      end
+    template do
+      p { "Plain" }
     end
   end
 
   class IgnoringUserPage < Crumble::Page
     model user : User
 
-    view do
-      template do
-        p { "No user access" }
-      end
+    template do
+      p { "No user access" }
     end
   end
 
